@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.static('public'));
 
 const mongoURI = process.env.MONGO_DB_URL;
-const dbName = 'mydatabase';
+const dbName = 'test';
 let db, filesCollection, client;
 
 // Function to check MongoDB connection
