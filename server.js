@@ -1,9 +1,8 @@
 const express = require('express');
-require('dotenv').config(); // Load environment variables
+require('dotenv').config();
 const multer = require('multer');
 const cors = require('cors');
 const { MongoClient } = require('mongodb');
-const { ObjectId } = require('mongodb');
 
 const app = express();
 app.use(cors());
@@ -13,29 +12,41 @@ const mongoURI = process.env.MONGO_DB_URL;
 const dbName = 'test';
 let db, filesCollection, client;
 
-// Function to check MongoDB connection
+// Debugging: Check if .env is loaded correctly
+console.log("🔍 MongoDB URI:", process.env.MONGO_DB_URL || "❌ Not Set!");
+
 const checkMongoDBConnection = async () => {
-    if (client && client.topology && client.topology.isConnected()) {
-        console.log('✅ MongoDB is connected');
-    } else {
-        console.log('❌ MongoDB is not connected');
+    try {
+        await client.db("admin").command({ ping: 1 });
+        console.log('✅ MongoDB connection is active');
+    } catch (error) {
+        console.error('❌ MongoDB connection lost. Reconnecting...', error);
+        connectToMongoDB(); // Attempt reconnection
     }
 };
 
-// Connect to MongoDB
 const connectToMongoDB = async () => {
+    if (client) {
+        console.log("ℹ️ MongoDB client already initialized.");
+        return;
+    }
+
     try {
-        client = await MongoClient.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true });
+        client = new MongoClient(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true });
+        await client.connect();
         db = client.db(dbName);
         filesCollection = db.collection('files');
         console.log('✅ Connected to MongoDB');
-        setInterval(checkMongoDBConnection, 5000); // Check connection every 5 seconds
+
+        setInterval(checkMongoDBConnection, 5000);
     } catch (err) {
-        console.error('Error connecting to MongoDB:', err);
+        console.error('❌ Error connecting to MongoDB:', err);
+        setTimeout(connectToMongoDB, 5000);
     }
 };
 
 connectToMongoDB();
+
 
 // Multer configuration (store file in memory)
 const storage = multer.memoryStorage();
@@ -56,24 +67,36 @@ app.get('/', (req, res) => {
 
 // File Upload Route
 app.post('/submit-form', upload.single('resume'), async (req, res) => {
+    console.log("📩 Received file:", req.file); // Debugging
     if (!req.file) {
+        console.log("❌ No file uploaded");
         return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
     try {
-        // Ensure the collection is defined and the MongoDB connection is established
-        if (!filesCollection) {
-            return res.status(500).json({ success: false, message: 'MongoDB collection is not initialized' });
+        const response = await fetch("https://backend-ten-sigma-28.vercel.app/submit-form", {
+            method: "POST",
+            body: formData,
+        });
+    
+        const text = await response.text();  // Get response as text first
+        console.log("🔍 Server Response:", text);
+    
+        const result = JSON.parse(text); // Try parsing JSON
+        if (result.success) {
+            successMessage.classList.remove("hidden");
+            setTimeout(() => {
+                successMessage.classList.add("hidden");
+                form.reset();
+            }, 3000);
+        } else {
+            alert("Error: " + result.message);
         }
-
-        const { originalname, mimetype, buffer } = req.file;
-        await filesCollection.insertOne({ filename: originalname, contentType: mimetype, data: buffer });
-        console.log("✅ File Uploaded to MongoDB:", originalname);
-        res.status(200).json({ success: true, message: 'File Uploaded Successfully', filename: originalname });
-    } catch (err) {
-        console.error('Error saving file to MongoDB:', err);
-        res.status(500).json({ success: false, message: 'Error saving file to MongoDB' });
+    } catch (error) {
+        console.error("❌ Fetch error:", error);
+        alert("Something went wrong. Please try again later.");
     }
-});
+    
+
 
 // Get List of Uploaded PDFs
 app.get('/get-files', async (req, res) => {
@@ -164,4 +187,4 @@ app.get('/file/:filename', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on https://backend-ten-sigma-28.vercel.app/:${PORT}`);
-});
+}); });
