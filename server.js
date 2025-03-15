@@ -6,17 +6,22 @@ const { MongoClient, ObjectId } = require("mongodb");
 
 const app = express();
 app.use(cors());
-app.use(express.json()); // Ensure JSON is parsed in requests
+app.use(express.json()); // Ensure JSON parsing
 app.use(express.static("public"));
 
 const mongoURI = process.env.MONGO_DB_URL;
-const dbName = "test";
+const dbName = "mydatabase";
 let db, filesCollection, client;
 
 // Debugging: Check if .env is loaded correctly
 console.log("🔍 MongoDB URI:", process.env.MONGO_DB_URL || "❌ Not Set!");
 
+// ✅ MongoDB Connection Function
 const connectToMongoDB = async () => {
+  if (client) {
+    console.log("ℹ️ MongoDB already connected.");
+    return;
+  }
   try {
     client = new MongoClient(mongoURI);
     await client.connect();
@@ -28,9 +33,15 @@ const connectToMongoDB = async () => {
   }
 };
 
-connectToMongoDB();
+// Ensure MongoDB is connected before handling requests
+app.use(async (req, res, next) => {
+  if (!db || !filesCollection) {
+    await connectToMongoDB();
+  }
+  next();
+});
 
-// Multer configuration (store file in memory)
+// ✅ Multer Configuration (store file in memory)
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
@@ -58,7 +69,6 @@ app.post("/submit-form", upload.single("resume"), async (req, res) => {
   }
 
   try {
-    // Store file in MongoDB
     const fileDoc = {
       filename: req.file.originalname,
       contentType: req.file.mimetype,
@@ -81,7 +91,7 @@ app.get("/get-files", async (req, res) => {
   try {
     const files = await filesCollection.find({}).toArray();
     const fileList = files.map((file) => ({
-      _id: file._id.toString(), // Convert ObjectId to string
+      _id: file._id.toString(),
       filename: file.filename,
     }));
 
@@ -92,7 +102,7 @@ app.get("/get-files", async (req, res) => {
   }
 });
 
-// ✅ Serve a file from MongoDB for inline viewing (by ID)
+// ✅ Serve a File by ID
 app.get("/file/:id", async (req, res) => {
   try {
     const file = await filesCollection.findOne({ _id: new ObjectId(req.params.id) });
@@ -103,11 +113,7 @@ app.get("/file/:id", async (req, res) => {
     }
 
     console.log("✅ File found in MongoDB:", file.filename);
-    res.set({
-      "Content-Type": file.contentType,
-      "Content-Disposition": "inline",
-    });
-
+    res.set({ "Content-Type": file.contentType, "Content-Disposition": "inline" });
     res.send(file.data.buffer);
   } catch (err) {
     console.error("❌ Error fetching file:", err);
@@ -115,9 +121,10 @@ app.get("/file/:id", async (req, res) => {
   }
 });
 
-// ✅ Server setup
+// ✅ Server Setup
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  await connectToMongoDB();
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
