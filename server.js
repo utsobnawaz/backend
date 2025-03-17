@@ -74,6 +74,7 @@ app.post("/submit-form", upload.single("resume"), async (req, res) => {
       contentType: req.file.mimetype,
       data: req.file.buffer,
       uploadedAt: new Date(),
+      status: "under_processing", // Default status for new uploads
     };
 
     const result = await filesCollection.insertOne(fileDoc);
@@ -93,12 +94,38 @@ app.get("/get-files", async (req, res) => {
     const fileList = files.map((file) => ({
       _id: file._id.toString(),
       filename: file.filename,
+      status: file.status, // Include status here
     }));
 
     res.json({ success: true, files: fileList });
   } catch (err) {
     console.error("❌ Error fetching files:", err);
     res.status(500).json({ success: false, message: "Error fetching files" });
+  }
+});
+
+// ✅ Update Status for a File (VC's action)
+app.post("/update-status", async (req, res) => {
+  const { id, status } = req.body; // The status should be under_processing, approved, or rejected
+
+  if (!id || !status) {
+    return res.status(400).json({ success: false, message: "Missing parameters" });
+  }
+
+  try {
+    const result = await filesCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status: status } }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ success: false, message: "File not found or status not updated" });
+    }
+
+    res.json({ success: true, message: "Status updated successfully" });
+  } catch (err) {
+    console.error("❌ Error updating status:", err);
+    res.status(500).json({ success: false, message: "Error updating status" });
   }
 });
 
