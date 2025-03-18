@@ -105,7 +105,7 @@ app.get("/get-files", async (req, res) => {
       filename: file.filename,
       status: file.status,
       passkey: file.passkey,
-      feedback: file.feedback, // Include feedback
+      feedback: file.feedback,
     }));
 
     res.json({ success: true, files: fileList });
@@ -159,15 +159,23 @@ app.post("/submit-feedback", async (req, res) => {
   }
 });
 
-// ✅ Fetch Feedback Using Passkey (User Access)
-app.get("/feedback/:passkey", async (req, res) => {
+// ✅ Fetch Feedback Using Passkey and File ID (User Access)
+app.post("/get-feedback", async (req, res) => {
+  const { fileId, passkey } = req.body;
+  if (!fileId || !passkey) {
+    return res.status(400).json({ success: false, message: "Missing parameters" });
+  }
+
   try {
-    const { passkey } = req.params;
-    const file = await filesCollection.findOne({ passkey });
+    const file = await filesCollection.findOne({ _id: new ObjectId(fileId) });
 
-    if (!file) return res.status(404).json({ success: false, message: "No file found with this passkey" });
+    if (!file) return res.status(404).json({ success: false, message: "File not found" });
 
-    res.json({ success: true, feedback: file.feedback || "No feedback available yet" });
+    if (file.passkey !== passkey) {
+      return res.status(403).json({ success: false, message: "Incorrect passkey" });
+    }
+
+    res.json({ success: true, feedback: file.feedback || "No feedback provided yet." });
   } catch (err) {
     console.error("❌ Error fetching feedback:", err);
     res.status(500).json({ success: false, message: "Error fetching feedback" });
