@@ -53,31 +53,27 @@ app.get("/", (req, res) => {
 
 // ✅ File Upload Route (with Passkey)
 app.post("/submit-form", upload.single("resume"), async (req, res) => {
-  const { passkey } = req.body;
-  if (!passkey) return res.status(400).json({ success: false, message: "Passkey is required" });
+  const { passkey, role } = req.body;
+  if (!passkey || !role) return res.status(400).json({ success: false, message: "Role and Passkey required" });
 
-  const existingFile = await filesCollection.findOne({ passkey });
-  if (existingFile) return res.status(400).json({ success: false, message: "Passkey already in use. Choose another." });
+  const exists = await filesCollection.findOne({ passkey });
+  if (exists) return res.status(400).json({ success: false, message: "Passkey already used" });
 
-  if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
+  if (!req.file) return res.status(400).json({ success: false, message: "PDF file required" });
 
-  try {
-    const fileDoc = {
-      filename: req.file.originalname,
-      contentType: req.file.mimetype,
-      data: req.file.buffer,
-      uploadedAt: new Date(),
-      status: "under_processing",
-      passkey: passkey,
-      feedback: null, // Initially no feedback
-    };
+  const fileDoc = {
+    filename: req.file.originalname,
+    contentType: req.file.mimetype,
+    data: req.file.buffer,
+    uploadedAt: new Date(),
+    status: "under_processing",
+    passkey,
+    role,
+    feedback: null
+  };
 
-    const result = await filesCollection.insertOne(fileDoc);
-    res.json({ success: true, fileId: result.insertedId });
-  } catch (error) {
-    console.error("❌ Error saving file:", error);
-    res.status(500).json({ success: false, message: "File upload failed" });
-  }
+  await filesCollection.insertOne(fileDoc);
+  res.json({ success: true, message: "File uploaded" });
 });
 
 // ✅ Retrieve File by Passkey (User Access)
