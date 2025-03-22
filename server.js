@@ -52,9 +52,12 @@ app.get("/", (req, res) => {
 });
 
 // ✅ File Upload Route (with Passkey)
+// ✅ File Upload Route (with Passkey & Category)
 app.post("/submit-form", upload.single("resume"), async (req, res) => {
-  const { passkey } = req.body;
+  const { passkey, category } = req.body;
+
   if (!passkey) return res.status(400).json({ success: false, message: "Passkey is required" });
+  if (!category) return res.status(400).json({ success: false, message: "Category is required" });
 
   const existingFile = await filesCollection.findOne({ passkey });
   if (existingFile) return res.status(400).json({ success: false, message: "Passkey already in use. Choose another." });
@@ -69,7 +72,8 @@ app.post("/submit-form", upload.single("resume"), async (req, res) => {
       uploadedAt: new Date(),
       status: "under_processing",
       passkey: passkey,
-      feedback: null, // Initially no feedback
+      category: category,  // ✅ Store category in DB
+      feedback: null,      // Initially no feedback
     };
 
     const result = await filesCollection.insertOne(fileDoc);
@@ -79,6 +83,7 @@ app.post("/submit-form", upload.single("resume"), async (req, res) => {
     res.status(500).json({ success: false, message: "File upload failed" });
   }
 });
+
 
 // ✅ Retrieve File by Passkey (User Access)
 app.get("/file/passkey/:passkey", async (req, res) => {
