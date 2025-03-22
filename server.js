@@ -13,7 +13,7 @@ const mongoURI = process.env.MONGO_DB_URL;
 const dbName = "mydatabase";
 let db, filesCollection, client;
 
-// ✅ Connect to MongoDB
+// ✅ MongoDB Connection Setup
 const connectToMongoDB = async () => {
   if (client) return;
   try {
@@ -27,42 +27,35 @@ const connectToMongoDB = async () => {
   }
 };
 
-// Ensure MongoDB is connected before handling requests
+// Ensure MongoDB connection is ready
 app.use(async (req, res, next) => {
   if (!db || !filesCollection) await connectToMongoDB();
   next();
 });
 
-// ✅ Multer Configuration (store files in memory)
+// ✅ Multer Setup (Memory Storage for PDFs)
 const storage = multer.memoryStorage();
 const upload = multer({
-  storage: storage,
+  storage,
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === "application/pdf") {
-      cb(null, true);
-    } else {
-      cb(new Error("Only PDF files allowed"), false);
-    }
+    if (file.mimetype === "application/pdf") cb(null, true);
+    else cb(new Error("Only PDF files are allowed"), false);
   },
 });
 
-// ✅ Root Route
+// ✅ Basic Route
 app.get("/", (req, res) => {
   res.send("RUET VC Connect Backend is running...");
 });
 
-// ✅ File Upload Route (with Passkey)
-// ✅ File Upload Route (with Passkey & Category)
+// ✅ File Upload with Passkey & Category
 app.post("/submit-form", upload.single("resume"), async (req, res) => {
   const { passkey, category } = req.body;
-
-  if (!passkey) return res.status(400).json({ success: false, message: "Passkey is required" });
-  if (!category) return res.status(400).json({ success: false, message: "Category is required" });
+  if (!passkey || !category) return res.status(400).json({ success: false, message: "Passkey and Category are required" });
+  if (!req.file) return res.status(400).json({ success: false, message: "No PDF file uploaded" });
 
   const existingFile = await filesCollection.findOne({ passkey });
   if (existingFile) return res.status(400).json({ success: false, message: "Passkey already in use. Choose another." });
-
-  if (!req.file) return res.status(400).json({ success: false, message: "No file uploaded" });
 
   try {
     const fileDoc = {
@@ -71,9 +64,9 @@ app.post("/submit-form", upload.single("resume"), async (req, res) => {
       data: req.file.buffer,
       uploadedAt: new Date(),
       status: "under_processing",
-      passkey: passkey,
-      category: category,  // ✅ Store category in DB
-      feedback: null,      // Initially no feedback
+      passkey,
+      category,
+      feedback: null,
     };
 
     const result = await filesCollection.insertOne(fileDoc);
@@ -84,33 +77,31 @@ app.post("/submit-form", upload.single("resume"), async (req, res) => {
   }
 });
 
-
-// ✅ Retrieve File by Passkey (User Access)
+// ✅ Serve PDF by Passkey (User Access)
 app.get("/file/passkey/:passkey", async (req, res) => {
   try {
-    const { passkey } = req.params;
-    const file = await filesCollection.findOne({ passkey });
-
+    const file = await filesCollection.findOne({ passkey: req.params.passkey });
     if (!file) return res.status(404).json({ success: false, message: "File not found" });
 
     res.set({ "Content-Type": file.contentType, "Content-Disposition": "inline" });
     res.send(file.data.buffer);
   } catch (err) {
-    console.error("❌ Error fetching file:", err);
+    console.error("❌ Error fetching file by passkey:", err);
     res.status(500).json({ success: false, message: "Error fetching file" });
   }
 });
 
-// ✅ Get List of Uploaded PDFs (VC Panel)
+// ✅ Retrieve all files for VC Panel (with Category)
 app.get("/get-files", async (req, res) => {
   try {
     const files = await filesCollection.find({}).toArray();
-    const fileList = files.map((file) => ({
+    const fileList = files.map(file => ({
       _id: file._id.toString(),
       filename: file.filename,
       status: file.status,
       passkey: file.passkey,
       feedback: file.feedback,
+      category: file.category || "Uncategorized",  // ✅ Fetch and display category
     }));
 
     res.json({ success: true, files: fileList });
@@ -120,7 +111,7 @@ app.get("/get-files", async (req, res) => {
   }
 });
 
-// ✅ Update Status for a File (VC Action)
+// ✅ Update File Status
 app.post("/update-status", async (req, res) => {
   const { id, status } = req.body;
   if (!id || !status) return res.status(400).json({ success: false, message: "Missing parameters" });
@@ -128,12 +119,9 @@ app.post("/update-status", async (req, res) => {
   try {
     const result = await filesCollection.updateOne(
       { _id: new ObjectId(id) },
-      { $set: { status: status } }
+      { $set: { status } }
     );
-
-    if (result.modifiedCount === 0) {
-      return res.status(404).json({ success: false, message: "File not found or status not updated" });
-    }
+    if (result.modifiedCount === 0) return res.status(404).json({ success: false, message: "File not found or status not updated" });
 
     res.json({ success: true, message: "Status updated successfully" });
   } catch (err) {
@@ -142,7 +130,7 @@ app.post("/update-status", async (req, res) => {
   }
 });
 
-// ✅ Submit Feedback (VC Action)
+// ✅ Submit Feedback
 app.post("/submit-feedback", async (req, res) => {
   const { id, feedback } = req.body;
   if (!id || !feedback) return res.status(400).json({ success: false, message: "Missing parameters" });
@@ -150,12 +138,9 @@ app.post("/submit-feedback", async (req, res) => {
   try {
     const result = await filesCollection.updateOne(
       { _id: new ObjectId(id) },
-      { $set: { feedback: feedback } }
+      { $set: { feedback } }
     );
-
-    if (result.modifiedCount === 0) {
-      return res.status(404).json({ success: false, message: "File not found or feedback not updated" });
-    }
+    if (result.modifiedCount === 0) return res.status(404).json({ success: false, message: "File not found or feedback not updated" });
 
     res.json({ success: true, message: "Feedback submitted successfully" });
   } catch (err) {
@@ -164,21 +149,16 @@ app.post("/submit-feedback", async (req, res) => {
   }
 });
 
-// ✅ Fetch Feedback Using Passkey and File ID (User Access)
+// ✅ Fetch Feedback Using Passkey and File ID
 app.post("/get-feedback", async (req, res) => {
   const { fileId, passkey } = req.body;
-  if (!fileId || !passkey) {
-    return res.status(400).json({ success: false, message: "Missing parameters" });
-  }
+  if (!fileId || !passkey) return res.status(400).json({ success: false, message: "Missing parameters" });
 
   try {
     const file = await filesCollection.findOne({ _id: new ObjectId(fileId) });
-
     if (!file) return res.status(404).json({ success: false, message: "File not found" });
 
-    if (file.passkey !== passkey) {
-      return res.status(403).json({ success: false, message: "Incorrect passkey" });
-    }
+    if (file.passkey !== passkey) return res.status(403).json({ success: false, message: "Incorrect passkey" });
 
     res.json({ success: true, feedback: file.feedback || "No feedback provided yet." });
   } catch (err) {
@@ -187,22 +167,21 @@ app.post("/get-feedback", async (req, res) => {
   }
 });
 
-// ✅ Serve a File by ID (VC Panel)
+// ✅ Serve PDF by ID (VC Access)
 app.get("/file/:id", async (req, res) => {
   try {
     const file = await filesCollection.findOne({ _id: new ObjectId(req.params.id) });
-
     if (!file) return res.status(404).json({ success: false, message: "File not found" });
 
     res.set({ "Content-Type": file.contentType, "Content-Disposition": "inline" });
     res.send(file.data.buffer);
   } catch (err) {
-    console.error("❌ Error fetching file:", err);
+    console.error("❌ Error fetching file by ID:", err);
     res.status(500).json({ success: false, message: "Error fetching file" });
   }
 });
 
-// ✅ Server Setup
+// ✅ Server Start
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   await connectToMongoDB();
