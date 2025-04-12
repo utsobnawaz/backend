@@ -181,21 +181,36 @@ app.get("/file/:id", async (req, res) => {
   }
 });
 
-// ✅ DELETE File by ID (Simple Buffer Storage)
+// ✅ DELETE File by ID (with Passkey Check)
 app.delete('/delete-file/:id', async (req, res) => {
   const fileId = req.params.id;
+  const { passkey } = req.body;  // Passkey should be in the body of the request
+
+  if (!passkey) {
+    return res.status(400).json({ success: false, message: "Passkey is required" });
+  }
 
   try {
+    const file = await filesCollection.findOne({ _id: new ObjectId(fileId) });
+
+    if (!file) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    if (file.passkey !== passkey) {
+      return res.status(403).json({ success: false, message: 'Invalid passkey. File not deleted.' });
+    }
+
     const result = await filesCollection.deleteOne({ _id: new ObjectId(fileId) });
 
     if (result.deletedCount === 0) {
-      return res.status(404).json({ success: false, message: 'File not found' });
+      return res.status(500).json({ success: false, message: 'Failed to delete file' });
     }
 
     res.json({ success: true, message: 'File deleted successfully' });
   } catch (err) {
-    console.error('❌ Error deleting file:', err);
-    res.status(500).json({ success: false, message: 'Failed to delete file' });
+    console.error("❌ Error deleting file:", err);
+    res.status(500).json({ success: false, message: 'Error during file deletion' });
   }
 });
 
