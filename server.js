@@ -141,22 +141,22 @@ app.post("/submit-feedback", async (req, res) => {
   }
 });
 
-app.post("/get-feedback", async (req, res) => {
+app.post('/verify-delete', async (req, res) => {
   const { fileId, passkey } = req.body;
-  if (!fileId || !passkey) return res.status(400).json({ success: false, message: "Missing parameters" });
 
+  // Verify the passkey and the fileId before allowing deletion
   try {
-    const file = await filesCollection.findOne({ _id: new ObjectId(fileId) });
-    if (!file) return res.status(404).json({ success: false, message: "File not found" });
-
-    if (file.passkey !== passkey) return res.status(403).json({ success: false, message: "Incorrect passkey" });
-
-    res.json({ success: true, feedback: file.feedback || "No feedback provided yet." });
+    const file = await File.findById(fileId);
+    if (!file || file.passkey !== passkey) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+    res.status(200).json({ success: true, message: 'Passkey verified' });
   } catch (err) {
-    console.error("❌ Error fetching feedback:", err);
-    res.status(500).json({ success: false, message: "Error fetching feedback" });
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+
 
 app.delete("/delete-file/:id", async (req, res) => {
   try {
