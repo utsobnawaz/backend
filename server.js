@@ -173,18 +173,14 @@ app.get("/file/:id", async (req, res) => {
 
 app.delete("/delete-file/:id", async (req, res) => {
   try {
-    const result = await filesCollection.deleteOne({ _id: new ObjectId(req.params.id) });
-
-    if (result.deletedCount === 0) {
-      return res.status(404).json({ success: false, message: "File not found" });
-    }
-
-    res.json({ success: true, message: "File deleted successfully" });
+    const fileId = req.params.id;
+    await File.deleteOne({ _id: fileId });
+    res.json({ success: true, message: "File deleted" });
   } catch (err) {
-    console.error("❌ Error deleting file:", err);
-    res.status(500).json({ success: false, message: "Failed to delete file" });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
