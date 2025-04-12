@@ -95,7 +95,7 @@ app.get("/get-files", async (req, res) => {
       passkey: file.passkey,
       feedback: file.feedback,
       category: file.category || "Uncategorized",
-      uploadDate: file.uploadedAt,
+      uploadDate: file.uploadedAt, // for frontend sorting
     }));
 
     res.json({ success: true, files: fileList });
@@ -158,32 +158,19 @@ app.post("/get-feedback", async (req, res) => {
   }
 });
 
-app.get("/file/:id", async (req, res) => {
-  try {
-    const file = await filesCollection.findOne({ _id: new ObjectId(req.params.id) });
-    if (!file) return res.status(404).json({ success: false, message: "File not found" });
-
-    res.set({ "Content-Type": file.contentType, "Content-Disposition": "inline" });
-    res.send(file.data.buffer);
-  } catch (err) {
-    console.error("❌ Error fetching file by ID:", err);
-    res.status(500).json({ success: false, message: "Error fetching file" });
-  }
-});
-
 app.delete("/delete-file/:id", async (req, res) => {
   try {
     const fileId = req.params.id;
     const result = await filesCollection.deleteOne({ _id: new ObjectId(fileId) });
 
     if (result.deletedCount === 0) {
-      return res.status(404).json({ success: false, message: "File not found or already deleted" });
+      return res.status(404).json({ success: false, message: "File not found" });
     }
 
-    res.json({ success: true, message: "File deleted successfully" });
+    res.json({ success: true, message: "File deleted" });
   } catch (err) {
     console.error("❌ Error deleting file:", err);
-    res.status(500).json({ success: false, message: "Server error during deletion" });
+    res.status(500).json({ success: false, message: "Error deleting file" });
   }
 });
 
