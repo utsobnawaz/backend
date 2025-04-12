@@ -187,5 +187,26 @@ app.listen(PORT, async () => {
   await connectToMongoDB();
   console.log(`🚀 Server running on port ${PORT}`);
 });
+// DELETE route to delete a file by ID
+app.delete('/delete-file/:id', async (req, res) => {
+  const fileId = req.params.id;
+
+  try {
+    const { GridFSBucket, ObjectId } = require('mongodb');
+    const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
+
+    // Delete file metadata from your application collection (if applicable)
+    await File.deleteOne({ _id: fileId });
+
+    // Delete file from GridFS
+    await bucket.delete(new ObjectId(fileId));
+
+    res.json({ success: true, message: 'File deleted successfully.' });
+  } catch (err) {
+    console.error('Error deleting file:', err);
+    res.status(500).json({ success: false, message: 'Failed to delete file.' });
+  }
+});
+
 
 module.exports = app;
