@@ -13,7 +13,6 @@ const mongoURI = process.env.MONGO_DB_URL;
 const dbName = "mydatabase";
 let db, filesCollection, client;
 
-// ✅ MongoDB Connection Setup
 const connectToMongoDB = async () => {
   if (client) return;
   try {
@@ -27,13 +26,11 @@ const connectToMongoDB = async () => {
   }
 };
 
-// Ensure MongoDB connection is ready
 app.use(async (req, res, next) => {
   if (!db || !filesCollection) await connectToMongoDB();
   next();
 });
 
-// ✅ Multer Setup (Memory Storage for PDFs)
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
@@ -43,12 +40,10 @@ const upload = multer({
   },
 });
 
-// ✅ Basic Route
 app.get("/", (req, res) => {
   res.send("RUET VC Connect Backend is running...");
 });
 
-// ✅ File Upload with Passkey & Category
 app.post("/submit-form", upload.single("resume"), async (req, res) => {
   const { passkey, category } = req.body;
   if (!passkey || !category) return res.status(400).json({ success: false, message: "Passkey and Category are required" });
@@ -77,7 +72,6 @@ app.post("/submit-form", upload.single("resume"), async (req, res) => {
   }
 });
 
-// ✅ Serve PDF by Passkey (User Access)
 app.get("/file/passkey/:passkey", async (req, res) => {
   try {
     const file = await filesCollection.findOne({ passkey: req.params.passkey });
@@ -91,7 +85,6 @@ app.get("/file/passkey/:passkey", async (req, res) => {
   }
 });
 
-// ✅ Retrieve all files for VC Panel (with Category)
 app.get("/get-files", async (req, res) => {
   try {
     const files = await filesCollection.find({}).toArray();
@@ -102,6 +95,7 @@ app.get("/get-files", async (req, res) => {
       passkey: file.passkey,
       feedback: file.feedback,
       category: file.category || "Uncategorized",
+      uploadDate: file.uploadedAt, // for frontend sorting
     }));
 
     res.json({ success: true, files: fileList });
@@ -111,7 +105,6 @@ app.get("/get-files", async (req, res) => {
   }
 });
 
-// ✅ Update File Status
 app.post("/update-status", async (req, res) => {
   const { id, status } = req.body;
   if (!id || !status) return res.status(400).json({ success: false, message: "Missing parameters" });
@@ -130,7 +123,6 @@ app.post("/update-status", async (req, res) => {
   }
 });
 
-// ✅ Submit Feedback
 app.post("/submit-feedback", async (req, res) => {
   const { id, feedback } = req.body;
   if (!id || !feedback) return res.status(400).json({ success: false, message: "Missing parameters" });
@@ -149,7 +141,6 @@ app.post("/submit-feedback", async (req, res) => {
   }
 });
 
-// ✅ Fetch Feedback Using Passkey and File ID
 app.post("/get-feedback", async (req, res) => {
   const { fileId, passkey } = req.body;
   if (!fileId || !passkey) return res.status(400).json({ success: false, message: "Missing parameters" });
@@ -167,7 +158,6 @@ app.post("/get-feedback", async (req, res) => {
   }
 });
 
-// ✅ Serve PDF by ID (VC Access)
 app.get("/file/:id", async (req, res) => {
   try {
     const file = await filesCollection.findOne({ _id: new ObjectId(req.params.id) });
@@ -181,25 +171,21 @@ app.get("/file/:id", async (req, res) => {
   }
 });
 
-// ✅ DELETE File by ID (Simple Buffer Storage)
-app.delete('/delete-file/:id', async (req, res) => {
-  const fileId = req.params.id;
-
+app.delete("/delete-file/:id", async (req, res) => {
   try {
-    const result = await filesCollection.deleteOne({ _id: new ObjectId(fileId) });
+    const result = await filesCollection.deleteOne({ _id: new ObjectId(req.params.id) });
 
     if (result.deletedCount === 0) {
-      return res.status(404).json({ success: false, message: 'File not found' });
+      return res.status(404).json({ success: false, message: "File not found" });
     }
 
-    res.json({ success: true, message: 'File deleted successfully' });
+    res.json({ success: true, message: "File deleted successfully" });
   } catch (err) {
-    console.error('❌ Error deleting file:', err);
-    res.status(500).json({ success: false, message: 'Failed to delete file' });
+    console.error("❌ Error deleting file:", err);
+    res.status(500).json({ success: false, message: "Failed to delete file" });
   }
 });
 
-// ✅ Server Start
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   await connectToMongoDB();
