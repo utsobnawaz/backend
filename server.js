@@ -95,7 +95,7 @@ app.get("/get-files", async (req, res) => {
       passkey: file.passkey,
       feedback: file.feedback,
       category: file.category || "Uncategorized",
-      uploadDate: file.uploadedAt, // for frontend sorting
+      uploadDate: file.uploadedAt,
     }));
 
     res.json({ success: true, files: fileList });
@@ -174,13 +174,18 @@ app.get("/file/:id", async (req, res) => {
 app.delete("/delete-file/:id", async (req, res) => {
   try {
     const fileId = req.params.id;
-    await File.deleteOne({ _id: fileId });
-    res.json({ success: true, message: "File deleted" });
+    const result = await filesCollection.deleteOne({ _id: new ObjectId(fileId) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: "File not found or already deleted" });
+    }
+
+    res.json({ success: true, message: "File deleted successfully" });
   } catch (err) {
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("❌ Error deleting file:", err);
+    res.status(500).json({ success: false, message: "Server error during deletion" });
   }
 });
-
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
