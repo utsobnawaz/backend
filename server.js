@@ -101,7 +101,7 @@ app.get("/get-files", async (req, res) => {
       status: file.status,
       passkey: file.passkey,
       feedback: file.feedback,
-      category: file.category || "Uncategorized",  // ✅ Fetch and display category
+      category: file.category || "Uncategorized",
     }));
 
     res.json({ success: true, files: fileList });
@@ -181,32 +181,29 @@ app.get("/file/:id", async (req, res) => {
   }
 });
 
+// ✅ DELETE File by ID (Simple Buffer Storage)
+app.delete('/delete-file/:id', async (req, res) => {
+  const fileId = req.params.id;
+
+  try {
+    const result = await filesCollection.deleteOne({ _id: new ObjectId(fileId) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    res.json({ success: true, message: 'File deleted successfully' });
+  } catch (err) {
+    console.error('❌ Error deleting file:', err);
+    res.status(500).json({ success: false, message: 'Failed to delete file' });
+  }
+});
+
 // ✅ Server Start
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   await connectToMongoDB();
   console.log(`🚀 Server running on port ${PORT}`);
 });
-// DELETE route to delete a file by ID
-app.delete('/delete-file/:id', async (req, res) => {
-  const fileId = req.params.id;
-
-  try {
-    const { GridFSBucket, ObjectId } = require('mongodb');
-    const bucket = new GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
-
-    // Delete file metadata from your application collection (if applicable)
-    await File.deleteOne({ _id: fileId });
-
-    // Delete file from GridFS
-    await bucket.delete(new ObjectId(fileId));
-
-    res.json({ success: true, message: 'File deleted successfully.' });
-  } catch (err) {
-    console.error('Error deleting file:', err);
-    res.status(500).json({ success: false, message: 'Failed to delete file.' });
-  }
-});
-
 
 module.exports = app;
