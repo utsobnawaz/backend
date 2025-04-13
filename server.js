@@ -181,6 +181,21 @@ app.get("/file/:id", async (req, res) => {
   }
 });
 
+app.delete("/delete-file/:id", async (req, res) => {
+  try {
+    const result = await filesCollection.deleteOne({ _id: new ObjectId(req.params.id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: "File not found or already deleted" });
+    }
+
+    res.json({ success: true, message: "File deleted successfully" });
+  } catch (err) {
+    console.error("❌ Error deleting file:", err);
+    res.status(500).json({ success: false, message: "Error during file deletion" });
+  }
+});
+
 // ✅ DELETE File by ID (with Passkey Check)
 app.delete('/delete-file/:id', async (req, res) => {
   const fileId = req.params.id;
