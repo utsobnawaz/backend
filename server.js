@@ -101,7 +101,7 @@ app.get("/get-files", async (req, res) => {
       status: file.status,
       passkey: file.passkey,
       feedback: file.feedback,
-      category: file.category || "Uncategorized",
+      category: file.category || "Uncategorized",  // ✅ Fetch and display category
     }));
 
     res.json({ success: true, files: fileList });
@@ -180,6 +180,7 @@ app.get("/file/:id", async (req, res) => {
     res.status(500).json({ success: false, message: "Error fetching file" });
   }
 });
+
 
 // ✅ DELETE File by ID (with Passkey Check)
 app.delete('/delete-file/:id', async (req, res) => {
