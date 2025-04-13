@@ -183,15 +183,15 @@ app.get("/file/:id", async (req, res) => {
 app.delete("/delete-all-files", async (req, res) => {
   try {
     const result = await filesCollection.deleteMany({});
-    
+
     if (result.deletedCount === 0) {
-      return res.status(404).json({ success: false, message: "No files found to delete" });
+      return res.status(404).json({ success: false, message: "No files to delete" });
     }
 
-    res.json({ success: true, message: "All files have been deleted successfully" });
+    res.json({ success: true, message: "All files deleted successfully" });
   } catch (err) {
     console.error("❌ Error deleting all files:", err);
-    res.status(500).json({ success: false, message: "Error during bulk file deletion" });
+    res.status(500).json({ success: false, message: "Error deleting files" });
   }
 });
 
